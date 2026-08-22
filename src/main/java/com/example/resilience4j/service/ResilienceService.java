@@ -14,28 +14,28 @@ public class ResilienceService {
 
     private static int retryCount = 1;
     private static long lastInvocationTime = -1;
+    private static String remoteServiceURL = "http://localhost:8080/test";
+    private static String retryURL = "http://localhost:8090/retry";
+    private static String remoteServiceDown = "The remote service is currently unavailable. Please try again after some time.";
 
-    @CircuitBreaker(name = "testCircuitBreaker", fallbackMethod = "fallbackCall")
+    @CircuitBreaker(name = "testCircuitBreaker", fallbackMethod = "fallbackForCircuitBreaker")
     public String executeRemoteCall() {
         logTimeDuration();
-        String dummyApiURL = "http://localhost:8080/test";
-        return restTemplate.getForObject(dummyApiURL, String.class);
+        return restTemplate.getForObject(remoteServiceURL, String.class);
     }
 
-    public String fallbackCall(Throwable throwable) {
-        String retryApiCall = "http://localhost:8090/retry";
-        return restTemplate.getForObject(retryApiCall, String.class);
+    public String fallbackForCircuitBreaker(Throwable throwable) {
+        return restTemplate.getForObject(retryURL, String.class);
     }
 
     @Retry(name = "testRetry", fallbackMethod = "fallbackForRetry")
     public String doRetryRemoteCall() {
         logTimeDuration();
-        String dummyApiURL = "http://localhost:8080/test";
-        return restTemplate.getForObject(dummyApiURL, String.class);
+        return restTemplate.getForObject(remoteServiceURL, String.class);
     }
 
     public String fallbackForRetry(Exception e) {
-        return "dummyApi is down";
+        return remoteServiceDown;
     }
 
 

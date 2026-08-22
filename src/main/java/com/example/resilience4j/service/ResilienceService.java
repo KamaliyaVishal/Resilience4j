@@ -59,7 +59,7 @@ public class ResilienceService {
         lastInvocationTime = currentTime;
     }
 
-    @Bulkhead(name = "testBulkHeadSemaphore", fallbackMethod = "fallbackForBulkheadSemaphore")
+    @Bulkhead(name = "testBulkHeadSemaphore", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "fallbackForBulkheadSemaphore")
     public String bulkheadSemaphore() {
         System.out.println("Bulkhead semaphore");
         ResponseEntity<String> response = restTemplate.getForEntity(bulkheadCallsApiUrl, String.class);

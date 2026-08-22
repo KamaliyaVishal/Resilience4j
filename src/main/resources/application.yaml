@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: resilience4j
+
+server:
+  port: 8090
+
+resilience4j.circuitbreaker.instances:
+  testCircuitBreaker:
+    registerHealthIndicator: true
+
+    # 1. Sliding Window Settings
+    slidingWindowType: COUNT_BASED       # Can be COUNT_BASED or TIME_BASED
+    slidingWindowSize: 10                # Monitor the last 10 requests
+    minimumNumberOfCalls: 5              # Minimum requests needed before calculating error rate
+
+    # 2. Failure Thresholds
+    failureRateThreshold: 50             # Open circuit if 50% or more calls fail
+    slowCallRateThreshold: 75            # Open circuit if 75% or more calls are slow
+    slowCallDurationThreshold: 5s    # A call taking > 5s seconds is considered slow
+
+    # 3. State Transitions & Timers
+    waitDurationInOpenState: 5s     # Wait 5 seconds in OPEN state before trying again (HALF-OPEN)
+    permittedNumberOfCallsInHalfOpenState: 3 # Test the network with 3 requests when HALF-OPEN
+    automaticTransitionFromOpenToHalfOpenEnabled: true # Move to HALF-OPEN automatically when timer expires
+
+    # 4. Exception Handling
+#    recordExceptions:                    # What counts as a failure
+#      - org.springframework.web.client.HttpServerErrorException
+#      - java.io.IOException
+#      - java.util.concurrent.TimeoutException
+#    ignoreExceptions:                    # What does NOT count as a failure (e.g., Client bad requests)
+#      - org.springframework.web.client.HttpClientErrorException
+
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        # 1. Expose health for status checks, and metrics/prometheus for detailed data
+        include: "health, metrics, prometheus"
+
+  endpoint:
+    health:
+      # 2. Required to see individual component details like the circuit breaker statuses
+      show-details: always
+      show-components: always
+
+  health:
+    # 3. CRUCIAL: Enables Resilience4j circuit breaker visibility inside /actuator/health
+    circuitbreakers:
+      enabled: true

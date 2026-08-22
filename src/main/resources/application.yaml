@@ -67,6 +67,32 @@ resilience4j:
         baseConfig: default                # Inherit everything from the default config above
         maxAttempts: 4                     # Override to allow more attempts for this service
 
+  # =========================================================================
+  # 1. SEMAPHORE BULKHEAD (Standard Blocking Calls)
+  # =========================================================================
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 10              # Max parallel threads allowed inside the service concurrently
+        maxWaitDuration: 4000ms              # Max time a waiting thread blocks if the bulkhead is full
+    instances:
+      testBulkHeadSemaphore:
+        baseConfig: default
+        maxConcurrentCalls: 5               # Override: Allow only 5 simultaneous requests for this instance
+
+  # =========================================================================
+  # 2. THREADPOOL BULKHEAD (Asynchronous Execution Only)
+  # =========================================================================
+  threadpoolbulkhead:
+    configs:
+      default:
+        maxThreadPoolSize: 4                # Max physical threads ever created in the pool
+        coreThreadPoolSize: 2               # Idle threads kept alive in the pool
+        queueCapacity: 2                   # Number of requests allowed to wait in line if pool is busy
+        keepAliveDuration: 20ms             # Time idle threads above core size survive before terminating
+    instances:
+      testBulkheadThreadPool:
+        baseConfig: default
 
 management:
   endpoints:

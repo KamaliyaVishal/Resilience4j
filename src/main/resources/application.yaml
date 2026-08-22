@@ -5,32 +5,67 @@ spring:
 server:
   port: 8090
 
-resilience4j.circuitbreaker.instances:
-  testCircuitBreaker:
-    registerHealthIndicator: true
+resilience4j:
+  # =========================================================================
+  # CIRCUIT BREAKER CONFIGURATION
+  # =========================================================================
+  circuitbreaker:
+    configs:
+      # 1. Define a global baseline blueprint
+      default:
+        registerHealthIndicator: true
 
-    # 1. Sliding Window Settings
-    slidingWindowType: COUNT_BASED       # Can be COUNT_BASED or TIME_BASED
-    slidingWindowSize: 10                # Monitor the last 10 requests
-    minimumNumberOfCalls: 5              # Minimum requests needed before calculating error rate
+        # Sliding Window Settings
+        slidingWindowType: COUNT_BASED       # Can be COUNT_BASED or TIME_BASED
+        slidingWindowSize: 10                # Monitor the last 10 requests
+        minimumNumberOfCalls: 5              # Minimum requests needed before calculating error rate
 
-    # 2. Failure Thresholds
-    failureRateThreshold: 50             # Open circuit if 50% or more calls fail
-    slowCallRateThreshold: 75            # Open circuit if 75% or more calls are slow
-    slowCallDurationThreshold: 5s    # A call taking > 5s seconds is considered slow
+        # Failure Thresholds
+        failureRateThreshold: 50             # Open circuit if 50% or more calls fail
+        slowCallRateThreshold: 75            # Open circuit if 75% or more calls are slow
+        slowCallDurationThreshold: 5s        # A call taking > 5s is considered slow
 
-    # 3. State Transitions & Timers
-    waitDurationInOpenState: 5s     # Wait 5 seconds in OPEN state before trying again (HALF-OPEN)
-    permittedNumberOfCallsInHalfOpenState: 3 # Test the network with 3 requests when HALF-OPEN
-    automaticTransitionFromOpenToHalfOpenEnabled: true # Move to HALF-OPEN automatically when timer expires
+        # State Transitions & Timers
+        waitDurationInOpenState: 5s          # Wait 5 seconds in OPEN state before trying again (HALF-OPEN)
+        permittedNumberOfCallsInHalfOpenState: 3 # Test the network with 3 requests when HALF-OPEN
+        automaticTransitionFromOpenToHalfOpenEnabled: true # Move to HALF-OPEN automatically when timer expires
 
-    # 4. Exception Handling
-#    recordExceptions:                    # What counts as a failure
-#      - org.springframework.web.client.HttpServerErrorException
-#      - java.io.IOException
-#      - java.util.concurrent.TimeoutException
-#    ignoreExceptions:                    # What does NOT count as a failure (e.g., Client bad requests)
-#      - org.springframework.web.client.HttpClientErrorException
+        # Exception Handling (Uncomment and adjust if you want explicit filtering)
+        #recordExceptions:
+        #  - org.springframework.web.client.HttpServerErrorException
+        #  - java.io.IOException
+        #  - java.util.concurrent.TimeoutException
+        #ignoreExceptions:
+        #  - org.springframework.web.client.HttpClientErrorException
+
+    instances:
+      # 2. Assign configuration to your specific @CircuitBreaker(name = "testCircuitBreaker")
+      testCircuitBreaker:
+        baseConfig: default                  # Inherit everything from the default config above
+
+  # =========================================================================
+  # RETRY CONFIGURATION
+  # =========================================================================
+  retry:
+    configs:
+      # 1. Define a global baseline blueprint
+      default:
+        maxAttempts: 3                     # Total tries (1 initial call + 2 retries)
+        waitDuration: 400ms                # Time to wait between standard retry attempts
+        enableExponentialBackoff: true     # Gradually increase wait time between retries
+        exponentialBackoffMultiplier: 2.0  # Double the wait time each time (500ms, then 1000ms)
+        retryExceptions:                   # Specify which exceptions trigger a retry
+          - java.lang.Exception
+        #  - org.springframework.web.client.ResourceAccessException # e.g., Network timeouts
+        #  - java.io.IOException
+        #ignoreExceptions:                  # Explicitly skip retries for client errors
+        #  - org.springframework.web.client.HttpClientErrorException # e.g., 404 or 400 Bad Request
+
+    instances:
+      # 2. Assign configuration to your specific @Retry(name = "testRetry")
+      testRetry:
+        baseConfig: default                # Inherit everything from the default config above
+        maxAttempts: 4                     # Override to allow more attempts for this service
 
 
 management:

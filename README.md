@@ -39,14 +39,14 @@ A Circuit Breaker prevents an application from repeatedly calling a service that
          │                                   │
          │        wait duration elapses      │
          │                ▼                  │
-         │         ┌──────────────┐          │
+         │         ┌───────────────┐         │
          └────────►│  HALF_OPEN    │◄────────┘
-                    │ (a few test   │
-                    │  calls allowed)│
-                    └──────┬────────┘
-                           │ any call fails
-                           ▼
-                        back to OPEN
+                   │ (a few test   │
+                   │ calls allowed │
+                   └──────┬────────┘
+                          │ any call fails
+                          ▼
+                     back to OPEN
 ```
 
 - **CLOSED** — normal operation. Every call goes through; the breaker keeps a rolling window of results and calculates the failure/slow-call rate.

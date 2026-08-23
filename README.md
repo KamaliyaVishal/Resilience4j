@@ -79,6 +79,32 @@ Each key under `instances` is a **named circuit breaker instance** — you refer
 | `registerHealthIndicator` | `true` | Expose this breaker's state via `/actuator/health` |
 | `recordExceptions` / `ignoreExceptions` (commented out) | — | Fine-grained control over what counts as a "failure." Here they're commented out, so **all** exceptions count by default. In production you'd typically record `HttpServerErrorException`, `IOException`, `TimeoutException` as failures, and *ignore* `HttpClientErrorException` (4xx client errors, like a bad request, aren't the downstream service's fault and shouldn't trip the breaker) |
 
+### RateLimiter & TimeLimiter placement (a common YAML trap)
+
+`resilience4j.timelimiter` must sit at the **same indentation level** as `circuitbreaker`, `retry`, `bulkhead`, `threadpoolbulkhead`, and `ratelimiter` — i.e. directly under `resilience4j:`, not nested inside `ratelimiter:`. It's an easy mistake to make since they're often documented back-to-back:
+
+```yaml
+resilience4j:
+  ratelimiter:
+    configs: ...
+    instances: ...
+
+  # <- 2 spaces, a sibling of ratelimiter, NOT indented further
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 2s
+        cancelRunningFuture: true
+    instances:
+      timeLimiter:              # must exactly match @TimeLimiter(name = "...")
+        baseConfig: default
+        timeoutDuration: 1s
+```
+
+If `timelimiter` ends up nested one level too deep, Spring Boot simply never binds it — there's no error, no startup failure, nothing in the logs. Resilience4j just silently falls back to library defaults (1s timeout) for every `@TimeLimiter`, and your configured override does nothing. This is one of the harder Resilience4j bugs to spot precisely because it fails silently instead of throwing.
+
+The second half of this trap is **instance naming**: the key under `instances:` must be the exact string passed to `name =` in the annotation. `@TimeLimiter(name = "timeLimiter", ...)` will not pick up an `instances.testTimeLimiter` block — it'll silently use `configs.default` instead, and your `testTimeLimiter` override becomes dead config. This applies to every Resilience4j module, not just TimeLimiter — always cross-check the YAML instance key against the annotation's `name` argument.
+
 ### Actuator section
 
 ```yaml
@@ -147,7 +173,9 @@ public class InventoryClient {
 
 Key points a senior candidate should call out:
 - The fallback method **must** be in the same class (proxy-based AOP — self-invocation doesn't trigger it, so calling `getStock()` from another method in the *same* class bypasses the breaker entirely).
-- The fallback's parameter list must match the original method's parameters, plus a trailing `Throwable`. You can also write multiple fallbacks overloaded for specific exception types.
+- The fallback's parameter list must match the original method's parameters **exactly**, plus a trailing `Throwable`. You can also write multiple fallbacks overloaded for specific exception types.
+  - **If the annotated method takes no arguments**, the fallback must be `fallback(Throwable ex)` — nothing else. Adding an unrelated extra parameter (e.g. a leftover `String id` copy-pasted from a different example) means Resilience4j can't find a matching fallback via reflection at all. It doesn't throw a compile error — it fails at runtime with `NoSuchMethodException: No fallback method match found`, and since that exception is unhandled, it surfaces as a generic `500 Internal Server Error` with no obvious link back to the real cause.
+  - The fallback's **return type** must equal (or be assignable to) the original method's return type. A method returning `String` paired with a fallback returning `ResponseEntity<String>` fails to match for the same reason. If a fallback needs to signal a distinct HTTP status (e.g. `429 TOO_MANY_REQUESTS` for a rate limiter or bulkhead), the *annotated method itself* has to return `ResponseEntity<T>`, not the raw body type — the fallback can't unilaterally widen the return type.
 - When the circuit is OPEN, the exception delivered to the fallback is `CallNotPermittedException`, not the original downstream exception — so if your fallback logic branches on exception type, handle that case explicitly.
 
 ### 4.3 Combining with Retry and TimeLimiter (production pattern)
@@ -187,7 +215,21 @@ Watch `resilience4j_circuitbreaker_state` transition 0 (CLOSED) → 1 (OPEN) →
 
 ---
 
-## 5. Quick-Fire Follow-Ups
+## 5. Common Pitfalls Found in This Project
+
+These are real bugs hit while wiring up this project — worth knowing since none of them throw a compile-time error, and most don't produce an obvious message pointing at the real cause.
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| Every protected endpoint returns a generic `500 Internal Server Error`, log shows `NoSuchMethodException: No fallback method match found` | Fallback method's parameter list or return type didn't match the annotated method (e.g. an extra unused `String id` parameter, or returning `ResponseEntity<String>` when the method returns `String`) | Fallback signature = original method's params, in order, plus a trailing `Throwable`/`Exception`; return type must equal or be assignable to the original's |
+| `@TimeLimiter`'s configured `timeoutDuration` never takes effect, no error at startup | `resilience4j.timelimiter` was indented one level too deep, nested inside `resilience4j.ratelimiter` instead of being a sibling of it — Spring Boot never binds it, so Resilience4j quietly uses library defaults | Move `timelimiter:` to the same indentation as `ratelimiter:`, `bulkhead:`, etc., directly under `resilience4j:` |
+| A rate limiter / time limiter override in YAML is defined but seemingly ignored | The `instances.<name>` key in YAML didn't match the string passed to `name =` in the annotation, so the instance fell back to `configs.default` | Keep the YAML instance key and the annotation's `name` argument identical, character-for-character |
+| A `CompletableFuture`-returning endpoint (thread-pool bulkhead) returns something like `java.util.concurrent.CompletableFuture@1a2b3c[Not completed]` instead of the actual response body | Controller called `.toString()` on the `CompletableFuture` itself instead of returning it, so it never awaited the async result | Return the `CompletableFuture<ResponseEntity<...>>` directly from the `@GetMapping` method and let Spring MVC's built-in async request handling resolve it |
+| Fallback methods work when annotations sit on a controller method calling itself, but the design still feels wrong | `@CircuitBreaker`/`@Retry`/etc. work via a Spring AOP proxy — putting them on controller methods mixes transport concerns (HTTP status codes, request mapping) with resilience concerns (retry/breaker state), and only works at all because the call comes in externally through the proxy | Keep resilience annotations on the **service layer**, next to the remote call they protect; let the controller stay a thin translation layer to `ResponseEntity` |
+
+---
+
+## 6. Quick-Fire Follow-Ups
 
 - **Q: Why have both `failureRateThreshold` and `slowCallRateThreshold`?** A hung/slow dependency ties up caller threads even without throwing — treating "too slow" as a failure mode is what actually protects the caller's thread pool.
 - **Q: Why `minimumNumberOfCalls` separate from `slidingWindowSize`?** So a brand-new instance (or one with low traffic) doesn't trip on 1-2 unlucky calls before there's a statistically meaningful sample.

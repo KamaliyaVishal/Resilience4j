@@ -14,8 +14,8 @@ public class ResilienceController {
     @Autowired
     private ResilienceService resilienceService;
 
-    @GetMapping("/test")
-    public ResponseEntity<String> doResilientCall() {
+    @GetMapping("/circuitBreaker")
+    public ResponseEntity<String> executeRemoteCall() {
         return ResponseEntity.ok(resilienceService.executeRemoteCall());
     }
 
@@ -34,34 +34,25 @@ public class ResilienceController {
         return resilienceService.bulkheadThreadPool();
     }
 
-    @GetMapping("/doBulkheadCalls")
-    public ResponseEntity<String> doBulkheadCalls() {
-        return ResponseEntity.ok(resilienceService.doBulkheadCalls());
-    }
-
     @GetMapping("/rateLimiter")
     public ResponseEntity<String> doRateLimit() {
         return resilienceService.doRateLimit();
     }
 
-    @GetMapping("/testRateLimit")
-    public ResponseEntity<String> testRateLimit() {
-        return ResponseEntity.ok("Success");
-    }
-
-    @GetMapping("/takingTimeAPI")
-    public ResponseEntity<String> takingTimeAPI() {
-        try {
-            Thread.sleep(4000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        }
-        return ResponseEntity.ok("Success");
-    }
-
     @GetMapping("/timeLimiter")
     public CompletableFuture<ResponseEntity<String>> processAsyncTask() {
         return resilienceService.processAsyncTask();
+    }
+
+    // Helper endpoints
+
+    @GetMapping("/mockWaitAPICall")
+    public ResponseEntity<String> mockWaitAPICall() {
+        return ResponseEntity.ok(resilienceService.mockWaitAPICall());
+    }
+
+    @GetMapping("/mockRemoteAPICall")
+    public ResponseEntity<String> mockRemoteAPICall() {
+        return ResponseEntity.ok("Success");
     }
 }

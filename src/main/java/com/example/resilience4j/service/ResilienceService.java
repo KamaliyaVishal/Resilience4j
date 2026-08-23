@@ -25,9 +25,8 @@ public class ResilienceService {
     private static final String remoteServiceURL = "http://localhost:8080/test";
     private static final String retryURL = "http://localhost:8090/retry";
     private static final String remoteServiceDownMsg = "The remote service is currently unavailable. Please try again after some time.";
-    private static final String bulkheadCallsApiUrl = "http://localhost:8090/doBulkheadCalls";
-    private static final String rateLimitTestApiURL = "http://localhost:8090/testRateLimit";
-    private static final String takingTimeApiUrl = "http://localhost:8090/takingTimeAPI";
+    private static final String mockWaitAPICallURL = "http://localhost:8090/mockWaitAPICall";
+    private static final String rateLimitTestApiURL = "http://localhost:8090/mockRemoteAPICall";
 
 
     @CircuitBreaker(name = "testCircuitBreaker", fallbackMethod = "fallbackForCircuitBreaker")
@@ -65,7 +64,7 @@ public class ResilienceService {
     @Bulkhead(name = "testBulkHeadSemaphore", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "fallbackForBulkheadSemaphore")
     public ResponseEntity<String> bulkheadSemaphore() {
         System.out.println("Bulkhead semaphore");
-        ResponseEntity<String> response = restTemplate.getForEntity(bulkheadCallsApiUrl, String.class);
+        ResponseEntity<String> response = restTemplate.getForEntity(mockWaitAPICallURL, String.class);
         System.out.println("Thread: " + Thread.currentThread().getName());
         return response;
     }
@@ -74,21 +73,21 @@ public class ResilienceService {
         return new ResponseEntity<>("Semaphore::Too many requests", HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    public String doBulkheadCalls() {
+    public String mockWaitAPICall() {
         try {
             Thread.sleep(4000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
-        return "BulkheadCall Success!";
+        return "Success!";
     }
 
     @Bulkhead(name = "testBulkheadThreadPool", type = Bulkhead.Type.THREADPOOL, fallbackMethod = "fallbackForBulkheadThreadPool")
     public CompletableFuture<ResponseEntity<String>> bulkheadThreadPool() {
         System.out.println("Bulkhead thread pool");
         return CompletableFuture.supplyAsync(() -> {
-            ResponseEntity<String> response = restTemplate.getForEntity(bulkheadCallsApiUrl, String.class);
+            ResponseEntity<String> response = restTemplate.getForEntity(mockWaitAPICallURL, String.class);
             System.out.println("Thread: " + Thread.currentThread().getName());
             System.out.println("response: " + response.getBody());
             return ResponseEntity.ok(response.getBody());
@@ -114,7 +113,7 @@ public class ResilienceService {
     @TimeLimiter(name = "testTimeLimiter", fallbackMethod = "fallbackForTimeLimiter")
     public CompletableFuture<ResponseEntity<String>> processAsyncTask() {
         return CompletableFuture.supplyAsync(() -> {
-            ResponseEntity<String> response = restTemplate.getForEntity(takingTimeApiUrl, String.class);
+            ResponseEntity<String> response = restTemplate.getForEntity(mockWaitAPICallURL, String.class);
             System.out.println("response: " + response.getBody());
             return response;
         });

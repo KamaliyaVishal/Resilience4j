@@ -2,12 +2,12 @@ package com.example.resilience4j.service;
 
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.CompletableFuture;
@@ -22,9 +22,9 @@ public class ResilienceService {
     private static long lastInvocationTime = -1;
     private static String remoteServiceURL = "http://localhost:8080/test";
     private static String retryURL = "http://localhost:8090/retry";
-    private static String remoteServiceDown = "The remote service is currently unavailable. Please try again after some time.";
+    private static String remoteServiceDownMsg = "The remote service is currently unavailable. Please try again after some time.";
     private static String bulkheadCallsApiUrl = "http://localhost:8090/doBulkheadCalls";
-
+    private static String reteLimitTestApiURL = "http://localhost:8090/testRateLimit";
 
     @CircuitBreaker(name = "testCircuitBreaker", fallbackMethod = "fallbackForCircuitBreaker")
     public String executeRemoteCall() {
@@ -43,7 +43,7 @@ public class ResilienceService {
     }
 
     public String fallbackForRetry(String id, Throwable e) {
-        return remoteServiceDown;
+        return remoteServiceDownMsg;
     }
 
 
@@ -95,5 +95,16 @@ public class ResilienceService {
         return CompletableFuture.completedFuture(
                 ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body("bulkheadThreadPool::Too Many Requests."));
+    }
+
+    @RateLimiter(name = "testRateLimiter", fallbackMethod = "fallbackForRateLimiter")
+    public String doRateLimit() {
+        System.out.println("RateLimit API Call");
+        ResponseEntity<String> response = restTemplate.getForEntity(reteLimitTestApiURL, String.class);
+        return response.getBody();
+    }
+
+    public ResponseEntity<String> fallbackForRateLimiter(String id, Exception e) {
+        return new ResponseEntity<>("Too Many Requests", HttpStatus.TOO_MANY_REQUESTS);
     }
 }

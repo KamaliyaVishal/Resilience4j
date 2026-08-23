@@ -94,6 +94,41 @@ resilience4j:
       testBulkheadThreadPool:
         baseConfig: default
 
+  # =========================================================================
+  # RATE LIMITER CONFIGURATION
+  # =========================================================================
+  ratelimiter:
+    configs:
+      # 1. Define a global baseline blueprint
+      default:
+        limitForPeriod: 4                  # Number of permissions available during one limit period
+        limitRefreshPeriod: 10s            # The duration of one limit period
+        timeoutDuration: 0s                # Thread wait time for permission before failing (0s = instant fail)
+        registerHealthIndicator: true
+
+    instances:
+      # 2. Assign configuration to your specific @RateLimiter(name = "testRateLimiter")
+      testRateLimiter:
+        baseConfig: default
+        limitForPeriod: 2                 # Override: Allow 10 requests every 10 seconds for this endpoint
+
+    # =========================================================================
+    # TIME LIMITER CONFIGURATION (Requires Async Method return types)
+    # =========================================================================
+    timelimiter:
+      configs:
+        # 1. Define a global baseline blueprint
+        default:
+          timeoutDuration: 2s                # Max time allowed for the remote execution to complete
+          cancelRunningFuture: true          # Automatically abort/kill the thread execution if a timeout occurs
+
+      instances:
+        # 2. Assign configuration to your specific @TimeLimiter(name = "testTimeLimiter")
+        testTimeLimiter:
+          baseConfig: default
+          timeoutDuration: 1s                # Override: Tighten timeout down to exactly 1 second for this call
+
+
 management:
   endpoints:
     web:

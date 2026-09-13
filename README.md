@@ -28,7 +28,7 @@ A Circuit Breaker prevents an application from repeatedly calling a service that
 
 ### The three states
 
-<img width="1197" height="880" alt="image" src="https://github.com/user-attachments/assets/a962fc60-77d8-4e4a-aad4-d429e1c9fcc1" />
+<img width="1197" height="880" alt="image" src="https://github.com/user-attachments/assets/1f6485f2-5bb6-4971-a8b4-a3f7753ecce7" />
 
 
 - **CLOSED** — normal operation. Every call goes through; the breaker keeps a rolling window of results and calculates the failure/slow-call rate.

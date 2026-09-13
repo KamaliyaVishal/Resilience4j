@@ -28,26 +28,8 @@ A Circuit Breaker prevents an application from repeatedly calling a service that
 
 ### The three states
 
-```
-        failure rate ≥ threshold
-   ┌────────────┐  ──────────────────►  ┌──────────┐
-   │   CLOSED   │                       │   OPEN   │
-   │ (calls go  │  ◄──────────────────  │ (calls   │
-   │  through)  │   enough successful   │  fail    │
-   └─────┬──────┘   calls in half-open  │  fast)   │
-         │                              └────┬─────┘
-         │                                   │
-         │        wait duration elapses      │
-         │                ▼                  │
-         │         ┌───────────────┐         │
-         └────────►│  HALF_OPEN    │◄────────┘
-                   │ (a few test   │
-                   │ calls allowed │
-                   └──────┬────────┘
-                          │ any call fails
-                          ▼
-                     back to OPEN
-```
+<img width="1197" height="880" alt="image" src="https://github.com/user-attachments/assets/a962fc60-77d8-4e4a-aad4-d429e1c9fcc1" />
+
 
 - **CLOSED** — normal operation. Every call goes through; the breaker keeps a rolling window of results and calculates the failure/slow-call rate.
 - **OPEN** — the failure/slow-call rate crossed the threshold. Calls fail immediately (`CallNotPermittedException`) without hitting the downstream service at all. This is what protects the caller.
